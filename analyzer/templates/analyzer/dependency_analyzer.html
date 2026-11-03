@@ -1,0 +1,205 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}Dependency Analyzer – {{ project.name }} – RepoSleuth{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}" class="text-secondary text-decoration-none">Dashboard</a>
+<span class="mx-2 text-muted">/</span>
+<a href="{% url 'project_detail' project.id %}" class="text-secondary text-decoration-none">{{ project.name }}</a>
+<span class="mx-2 text-muted">/</span>
+<span class="text-light fw-medium">Dependency Analyzer</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Header / Metric Summary -->
+    <div class="sleuth-card mb-3 p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h5 class="fw-bold text-white mb-0"><i class="bi bi-diagram-3-fill text-primary me-2"></i>Python Module Dependency Analyzer</h5>
+                <small class="text-muted">Extracted via Python AST. Distinguishes confirmed local imports from estimated and third-party modules.</small>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge-confirmed"><i class="bi bi-check2-circle me-1"></i> {{ confirmed_count }} Confirmed Links</span>
+                <span class="badge-estimated"><i class="bi bi-question-circle me-1"></i> {{ estimated_count }} Estimated Links</span>
+                <span class="badge-framework"><i class="bi bi-box-seam me-1"></i> {{ external_dependencies|length }} External Packages</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Visualizer and External Libs Layout -->
+    <div class="row g-3">
+        <!-- Interactive Graph (Vis-Network) -->
+        <div class="col-lg-8 col-xl-9">
+            <div class="sleuth-card p-3 mb-0">
+                <div class="d-flex flex-wrap align-items-center justify-content-between pb-2 mb-2 border-bottom border-secondary border-opacity-25 gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-secondary fw-semibold" style="font-size: 0.8rem; text-transform: uppercase;">Dependency Graph</span>
+                        <div class="d-flex align-items-center gap-2" style="font-size: 0.8rem;">
+                            <span class="d-inline-block rounded-circle" style="width: 10px; height: 10px; background-color: #10b981;"></span>
+                            <span class="text-muted">Confirmed (Solid)</span>
+                            <span class="d-inline-block rounded-circle ms-2" style="width: 10px; height: 10px; background-color: #f59e0b;"></span>
+                            <span class="text-muted">Estimated (Dashed)</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" id="btnFitGraph" title="Fit Entire Graph">
+                            <i class="bi bi-arrows-fullscreen"></i> Fit
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="btnTogglePhysics" title="Freeze / Unfreeze Layout">
+                            <i class="bi bi-pause-fill"></i> Freeze
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Graph Container -->
+                <div id="network-graph-container"></div>
+                <small class="text-muted d-block mt-2" style="font-size: 0.76rem;">
+                    <i class="bi bi-info-circle me-1"></i> Scroll to zoom, drag nodes or background to pan. Click on a node or edge to inspect import details.
+                </small>
+            </div>
+        </div>
+
+        <!-- External Libraries Panel -->
+        <div class="col-lg-4 col-xl-3">
+            <div class="sleuth-card p-3 mb-0" style="max-height: 690px; overflow-y: auto;">
+                <div class="card-title-lg mb-2 pb-2 border-bottom border-secondary border-opacity-25" style="font-size: 0.95rem;">
+                    <div>
+                        <i class="bi bi-box-seam text-info me-2"></i>
+                        <span>External Packages</span>
+                    </div>
+                    <span class="badge bg-secondary">{{ external_dependencies|length }}</span>
+                </div>
+                <p class="text-muted mb-3" style="font-size: 0.78rem;">
+                    Third-party dependencies detected through module imports outside standard library and project files.
+                </p>
+
+                {% if external_dependencies %}
+                <div class="list-group list-group-flush">
+                    {% for dep in external_dependencies %}
+                    <div class="list-group-item bg-transparent px-0 py-2 border-secondary border-opacity-25">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="fw-semibold text-light font-monospace" style="font-size: 0.88rem;">{{ dep.package }}</span>
+                            <span class="badge bg-dark border border-secondary text-info" style="font-size: 0.72rem;">{{ dep.count }} import{{ dep.count|pluralize }}</span>
+                        </div>
+                        <div class="text-muted text-truncate" style="font-size: 0.72rem;" title="{{ dep.files|join:', ' }}">
+                            Used in: {{ dep.files|join:', ' }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted" style="font-size: 0.85rem;">
+                    <i class="bi bi-check-circle fs-2 d-block mb-2 text-success"></i>
+                    No external packages detected. Codebase relies only on Python standard libraries.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const rawNodes = {{ nodes|safe }};
+    const rawEdges = {{ edges|safe }};
+
+    const container = document.getElementById('network-graph-container');
+
+    // Format nodes for Vis.js
+    const visNodes = rawNodes.map(n => ({
+        id: n.id,
+        label: n.label,
+        title: n.path,
+        shape: 'box',
+        margin: 10,
+        color: {
+            background: '#1e1b4b',
+            border: '#6366f1',
+            highlight: {
+                background: '#312e81',
+                border: '#8b5cf6'
+            }
+        },
+        font: {
+            color: '#f8fafc',
+            face: 'JetBrains Mono',
+            size: 13
+        },
+        borderWidth: 1.5,
+        shadow: {
+            enabled: true,
+            color: 'rgba(0,0,0,0.4)',
+            size: 8
+        }
+    }));
+
+    // Format edges for Vis.js
+    const visEdges = rawEdges.map((e, idx) => {
+        const isConfirmed = (e.status === 'confirmed');
+        const edgeColor = isConfirmed ? '#10b981' : '#f59e0b';
+        return {
+            id: 'edge_' + idx,
+            from: e.from,
+            to: e.to,
+            arrows: 'to',
+            title: `<b>Import:</b> ${e.label}<br/><b>Status:</b> ${isConfirmed ? 'Confirmed Local' : 'Estimated Local'}`,
+            color: {
+                color: edgeColor,
+                highlight: '#ffffff',
+                hover: '#ffffff'
+            },
+            dashes: !isConfirmed,
+            width: isConfirmed ? 2 : 1.5,
+            smooth: {
+                type: 'cubicBezier',
+                roundness: 0.2
+            }
+        };
+    });
+
+    const data = {
+        nodes: new vis.DataSet(visNodes),
+        edges: new vis.DataSet(visEdges)
+    };
+
+    const options = {
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: {
+                gravitationalConstant: -50,
+                centralGravity: 0.01,
+                springLength: 120,
+                springConstant: 0.08
+            },
+            stabilization: {
+                iterations: 150
+            }
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 100,
+            zoomView: true,
+            dragView: true
+        }
+    };
+
+    const network = new vis.Network(container, data, options);
+
+    // Controls
+    document.getElementById('btnFitGraph')?.addEventListener('click', () => {
+        network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+    });
+
+    let physicsEnabled = true;
+    document.getElementById('btnTogglePhysics')?.addEventListener('click', function() {
+        physicsEnabled = !physicsEnabled;
+        network.setOptions({ physics: { enabled: physicsEnabled } });
+        this.innerHTML = physicsEnabled ? '<i class="bi bi-pause-fill"></i> Freeze' : '<i class="bi bi-play-fill"></i> Unfreeze';
+    });
+</script>
+{% endblock %}

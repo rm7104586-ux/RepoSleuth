@@ -1,0 +1,216 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}File Explorer – {{ project.name }} – RepoSleuth{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}" class="text-secondary text-decoration-none">Dashboard</a>
+<span class="mx-2 text-muted">/</span>
+<a href="{% url 'project_detail' project.id %}" class="text-secondary text-decoration-none">{{ project.name }}</a>
+<span class="mx-2 text-muted">/</span>
+<span class="text-light fw-medium">File Explorer</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="sleuth-card mb-3 p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h5 class="fw-bold text-white mb-0"><i class="bi bi-folder-symlink text-primary me-2"></i>Interactive File Explorer</h5>
+                <small class="text-muted">Hierarchical codebase navigation. Click on any source file to preview code contents with line numbers.</small>
+            </div>
+            <div class="d-flex gap-2 text-secondary" style="font-size: 0.82rem;">
+                <span class="badge bg-dark border border-secondary text-light px-2 py-1"><i class="bi bi-files me-1"></i> {{ project.total_files }} Files</span>
+                <span class="badge bg-dark border border-secondary text-light px-2 py-1"><i class="bi bi-folder me-1"></i> {{ project.total_folders }} Folders</span>
+                <span class="badge bg-dark border border-secondary text-light px-2 py-1"><i class="bi bi-hdd me-1"></i> {{ project.formatted_size }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Tree View Left Pane -->
+        <div class="col-lg-5 col-xl-4">
+            <div class="sleuth-card p-3" style="max-height: 720px; overflow-y: auto;">
+                <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom border-secondary border-opacity-25">
+                    <span class="text-secondary fw-semibold" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Root Directory</span>
+                    <button class="btn btn-sm btn-outline-secondary py-0 px-2" id="collapseAllBtn" style="font-size: 0.75rem;">Toggle Folders</button>
+                </div>
+
+                <div id="fileTreeContainer">
+                    <!-- Recursive Macro or JS Renderer -->
+                    <div id="treeRoot"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Viewer Right Pane -->
+        <div class="col-lg-7 col-xl-8">
+            <div class="code-viewer-container" id="codeViewer">
+                <div class="code-viewer-header">
+                    <div class="d-flex align-items-center gap-2 text-truncate">
+                        <i class="bi bi-file-earmark-code text-primary fs-5"></i>
+                        <span id="activeFilePath" class="text-white fw-semibold text-truncate">Select a file from the explorer to preview</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2" id="fileMetaBadges" style="display: none !important;">
+                        <span class="badge bg-secondary" id="activeFileLang">Python</span>
+                        <span class="badge bg-dark border border-secondary text-light" id="activeFileLines">0 lines</span>
+                        <span class="badge bg-dark border border-secondary text-light" id="activeFileSize">0 B</span>
+                    </div>
+                </div>
+
+                <div class="code-viewer-body" id="codeContentBody">
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-code-square fs-1 d-block mb-2 text-secondary"></i>
+                        Click on any code or text file in the left directory tree to inspect its contents.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const fileTreeData = {{ file_tree|safe }};
+    const treeRoot = document.getElementById('treeRoot');
+    const activeFilePath = document.getElementById('activeFilePath');
+    const fileMetaBadges = document.getElementById('fileMetaBadges');
+    const activeFileLang = document.getElementById('activeFileLang');
+    const activeFileLines = document.getElementById('activeFileLines');
+    const activeFileSize = document.getElementById('activeFileSize');
+    const codeContentBody = document.getElementById('codeContentBody');
+
+    function getFileIcon(ext) {
+        switch (ext) {
+            case '.py': return 'bi-filetype-py text-primary';
+            case '.js': return 'bi-filetype-js text-warning';
+            case '.html': return 'bi-filetype-html text-danger';
+            case '.css': return 'bi-filetype-css text-info';
+            case '.json': return 'bi-filetype-json text-warning';
+            case '.md': return 'bi-filetype-md text-secondary';
+            case '.sql': return 'bi-filetype-sql text-info';
+            default: return 'bi-file-earmark-text text-secondary';
+        }
+    }
+
+    function renderTreeNodes(nodes, container) {
+        nodes.forEach(node => {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'tree-node';
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'tree-item';
+
+            if (node.type === 'folder') {
+                itemDiv.innerHTML = `
+                    <i class="bi bi-folder-fill text-warning folder-toggle-icon"></i>
+                    <span class="text-light fw-medium">${node.name}</span>
+                    <small class="text-muted ms-auto" style="font-size: 0.72rem;">${node.child_count} items</small>
+                `;
+
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'tree-children';
+                renderTreeNodes(node.children || [], childrenDiv);
+
+                itemDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isHidden = childrenDiv.style.display === 'none';
+                    childrenDiv.style.display = isHidden ? 'block' : 'none';
+                    const icon = itemDiv.querySelector('.folder-toggle-icon');
+                    if (isHidden) {
+                        icon.className = 'bi bi-folder2-open text-warning folder-toggle-icon';
+                    } else {
+                        icon.className = 'bi bi-folder-fill text-warning folder-toggle-icon';
+                    }
+                });
+
+                nodeDiv.appendChild(itemDiv);
+                nodeDiv.appendChild(childrenDiv);
+            } else {
+                const iconClass = getFileIcon(node.extension);
+                itemDiv.innerHTML = `
+                    <i class="bi ${iconClass}"></i>
+                    <span class="text-truncate" title="${node.name}">${node.name}</span>
+                    <small class="text-muted ms-auto" style="font-size: 0.72rem;">${node.formatted_size}</small>
+                `;
+
+                itemDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('active'));
+                    itemDiv.classList.add('active');
+                    loadFilePreview(node.path);
+                });
+
+                nodeDiv.appendChild(itemDiv);
+            }
+
+            container.appendChild(nodeDiv);
+        });
+    }
+
+    if (fileTreeData && fileTreeData.length > 0) {
+        renderTreeNodes(fileTreeData, treeRoot);
+    } else {
+        treeRoot.innerHTML = '<div class="text-muted py-3 text-center">No files extracted.</div>';
+    }
+
+    function loadFilePreview(filePath) {
+        activeFilePath.textContent = filePath;
+        codeContentBody.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Loading file content...
+            </div>
+        `;
+
+        fetch(`{% url 'file_content_api' project.id %}?path=${encodeURIComponent(filePath)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    fileMetaBadges.style.setProperty('display', 'flex', 'important');
+                    activeFileLang.textContent = data.language;
+                    activeFileLines.textContent = `${data.total_lines} lines`;
+                    activeFileSize.textContent = data.formatted_size;
+
+                    let html = '';
+                    data.lines.forEach(line => {
+                        const escaped = line.text
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;');
+                        html += `
+                            <div class="code-line">
+                                <span class="code-line-num">${line.line_num}</span>
+                                <span class="code-line-text">${escaped || ' '}</span>
+                            </div>
+                        `;
+                    });
+                    codeContentBody.innerHTML = html;
+                } else {
+                    fileMetaBadges.style.setProperty('display', 'none', 'important');
+                    codeContentBody.innerHTML = `
+                        <div class="p-4 text-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i> ${data.error || 'Failed to preview file.'}
+                        </div>
+                    `;
+                }
+            })
+            .catch(err => {
+                codeContentBody.innerHTML = `
+                    <div class="p-4 text-danger">
+                        <i class="bi bi-x-circle me-2"></i> Network error while fetching file: ${err}
+                    </div>
+                `;
+            });
+    }
+
+    // Toggle folders button
+    document.getElementById('collapseAllBtn')?.addEventListener('click', () => {
+        const allChildren = document.querySelectorAll('.tree-children');
+        const anyVisible = Array.from(allChildren).some(c => c.style.display !== 'none');
+        allChildren.forEach(c => {
+            c.style.display = anyVisible ? 'none' : 'block';
+        });
+    });
+</script>
+{% endblock %}

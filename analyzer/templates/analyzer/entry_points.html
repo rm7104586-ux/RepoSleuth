@@ -1,0 +1,92 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}Entry Points – {{ project.name }} – RepoSleuth{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}" class="text-secondary text-decoration-none">Dashboard</a>
+<span class="mx-2 text-muted">/</span>
+<a href="{% url 'project_detail' project.id %}" class="text-secondary text-decoration-none">{{ project.name }}</a>
+<span class="mx-2 text-muted">/</span>
+<span class="text-light fw-medium">Entry Points</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="sleuth-card mb-4 p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h5 class="fw-bold text-white mb-0"><i class="bi bi-play-circle-fill text-success me-2"></i>Application Entry Point Detector</h5>
+                <small class="text-muted">Uncovers program bootstrap and execution files using convention rules, framework initializers, and AST execution blocks.</small>
+            </div>
+            <div>
+                <span class="badge bg-dark border border-secondary text-light px-3 py-2 fs-6">
+                    {{ entry_points|length }} Entry Point{{ entry_points|length|pluralize }} Identified
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entry Points Grid -->
+    <div class="row g-4">
+        {% for ep in entry_points %}
+        <div class="col-lg-6">
+            <div class="sleuth-card h-100 mb-0">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="stat-icon-wrapper {% if ep.confidence == 'High' %}stat-icon-emerald{% elif ep.confidence == 'Medium' %}stat-icon-purple{% else %}stat-icon-blue{% endif %}" style="width: 40px; height: 40px; font-size: 1.15rem;">
+                            <i class="bi bi-terminal-fill"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-white fw-bold mb-0 font-monospace">{{ ep.filename }}</h6>
+                            <small class="text-muted">{{ ep.file }}</small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <span class="badge-framework">{{ ep.framework }}</span>
+                        {% if ep.confidence == 'High' %}
+                            <span class="badge-confirmed"><i class="bi bi-shield-check me-1"></i> High</span>
+                        {% elif ep.confidence == 'Medium' %}
+                            <span class="badge-estimated">Medium</span>
+                        {% else %}
+                            <span class="badge-low">Possible</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="text-light fw-semibold" style="font-size: 0.88rem;">{{ ep.role }}</h6>
+                    <ul class="list-unstyled mb-0" style="font-size: 0.84rem; color: #cbd5e1;">
+                        {% for reason in ep.reasons %}
+                        <li class="mb-1 d-flex align-items-start gap-2">
+                            <i class="bi bi-arrow-right-short text-primary fs-5" style="line-height: 1;"></i>
+                            <span>{{ reason }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                {% if ep.snippet %}
+                <div class="mt-3">
+                    <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 0.74rem;">
+                        <span class="text-secondary fw-semibold">CODE SNIPPET {% if ep.line %}(Line {{ ep.line }}){% endif %}</span>
+                        <a href="{% url 'file_explorer' project.id %}" class="text-primary text-decoration-none">Inspect in Explorer <i class="bi bi-box-arrow-up-right"></i></a>
+                    </div>
+                    <pre class="code-block mb-0"><code>{{ ep.snippet }}</code></pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="sleuth-card text-center py-5 text-muted">
+                <i class="bi bi-question-circle fs-1 d-block mb-2 text-secondary"></i>
+                <h5 class="text-light">No Standard Entry Points Detected</h5>
+                <p class="mb-0">None of the inspected Python files contain conventional entry scripts (manage.py, main.py, app.py) or `if __name__ == '__main__':` blocks.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

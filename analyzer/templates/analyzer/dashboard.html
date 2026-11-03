@@ -1,0 +1,237 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard – RepoSleuth Codebase Analyzer{% endblock %}
+
+{% block breadcrumb %}
+<span class="text-light fw-medium"><i class="bi bi-grid-1x2-fill me-1 text-primary"></i> Dashboard</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Hero / Welcome Banner -->
+    <div class="sleuth-card mb-4" style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.7), rgba(15, 23, 42, 0.9)); border-color: rgba(99, 102, 241, 0.3);">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <span class="badge badge-framework mb-2"><i class="bi bi-cpu-fill me-1"></i> Static Python AST Engine</span>
+                <h2 class="fw-bold mb-2 text-white">Smart Codebase Analyzer & Explorer</h2>
+                <p class="text-secondary mb-0" style="max-width: 650px;">
+                    Understand and analyze large software projects by scanning their source code. Automatically inspect file structures, map module dependencies, uncover application entry points, and detect code smells.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <a href="{% url 'project_upload' %}" class="btn-sleuth-primary me-2">
+                    <i class="bi bi-upload"></i> Upload ZIP
+                </a>
+                <a href="{% url 'load_demo' %}" class="btn-sleuth-secondary">
+                    <i class="bi bi-lightning-charge"></i> Instant Demo
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Metrics Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-purple">
+                    <i class="bi bi-folder-check"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ total_projects }}</div>
+                    <div class="stat-label">Projects Scanned</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-blue">
+                    <i class="bi bi-files"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ total_files|default:"0" }}</div>
+                    <div class="stat-label">Total Files Cataloged</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-emerald">
+                    <i class="bi bi-code-slash"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ total_loc|default:"0" }}</div>
+                    <div class="stat-label">Lines of Code</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-rose">
+                    <i class="bi bi-bug-fill"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ total_issues }}</div>
+                    <div class="stat-label">Detected Issues</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts & Analytics Row -->
+    <div class="row g-4 mb-4">
+        <!-- Recent Scans Table -->
+        <div class="col-lg-8">
+            <div class="sleuth-card h-100 mb-0">
+                <div class="card-title-lg">
+                    <div>
+                        <i class="bi bi-clock-history text-primary me-2"></i>
+                        <span>Recent Project Scans</span>
+                    </div>
+                    <a href="{% url 'history' %}" class="btn-sleuth-outline text-decoration-none py-1 px-2" style="font-size: 0.78rem;">
+                        View All
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="sleuth-table">
+                        <thead>
+                            <tr>
+                                <th>Project Name</th>
+                                <th>Files</th>
+                                <th>Code Lines</th>
+                                <th>Issues</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in recent_projects %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'project_detail' p.id %}" class="text-decoration-none fw-semibold text-light">
+                                        <i class="bi bi-folder2-open text-primary me-2"></i>{{ p.name }}
+                                    </a>
+                                    <div class="text-muted" style="font-size: 0.75rem;">{{ p.uploaded_at|date:"M d, Y · H:i" }}</div>
+                                </td>
+                                <td>{{ p.total_files }}</td>
+                                <td>{{ p.total_lines_of_code }}</td>
+                                <td>
+                                    {% if p.analysis.issue_counts.total %}
+                                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25">
+                                            {{ p.analysis.issue_counts.total }} issues
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted" style="font-size: 0.8rem;">None</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if p.status == 'completed' %}
+                                        <span class="badge-confirmed"><i class="bi bi-check-circle me-1"></i> Ready</span>
+                                    {% elif p.status == 'analyzing' %}
+                                        <span class="badge-estimated"><i class="bi bi-arrow-repeat me-1"></i> Scanning</span>
+                                    {% elif p.status == 'failed' %}
+                                        <span class="badge-high"><i class="bi bi-x-circle me-1"></i> Failed</span>
+                                    {% else %}
+                                        <span class="badge-low">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'project_detail' p.id %}" class="btn btn-outline-secondary" title="View Project Overview">
+                                            <i class="bi bi-arrow-right"></i>
+                                        </a>
+                                        <a href="{% url 'project_pdf' p.id %}" class="btn btn-outline-secondary" title="Download PDF Report">
+                                            <i class="bi bi-file-earmark-pdf text-danger"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
+                                    No projects scanned yet. Click <b>"Upload ZIP"</b> or <b>"Instant Demo"</b> to start analyzing!
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Language Distribution Chart -->
+        <div class="col-lg-4">
+            <div class="sleuth-card h-100 mb-0">
+                <div class="card-title-lg">
+                    <div>
+                        <i class="bi bi-pie-chart-fill text-warning me-2"></i>
+                        <span>Languages Breakdown</span>
+                    </div>
+                </div>
+
+                {% if chart_labels %}
+                <div style="position: relative; height: 260px;">
+                    <canvas id="languageDistributionChart"></canvas>
+                </div>
+                <div class="mt-3 pt-3 border-top border-secondary border-opacity-25" style="font-size: 0.8rem; color: var(--text-secondary);">
+                    Calculated across all scanned project repositories based on file extensions and lines of code.
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-bar-chart fs-1 d-block mb-2 text-secondary"></i>
+                    Upload a project to visualize language distribution.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if chart_labels %}
+<script>
+    const ctx = document.getElementById('languageDistributionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [{
+                data: {{ chart_data|safe }},
+                backgroundColor: [
+                    '#6366f1', // Indigo
+                    '#38bdf8', // Sky Blue
+                    '#8b5cf6', // Purple
+                    '#10b981', // Emerald
+                    '#f59e0b', // Amber
+                    '#ec4899', // Pink
+                ],
+                borderColor: '#111827',
+                borderWidth: 2,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#94a3b8',
+                        font: { family: 'Inter', size: 12 },
+                        padding: 14
+                    }
+                }
+            },
+            cutout: '65%'
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

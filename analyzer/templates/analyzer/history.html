@@ -1,0 +1,129 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}Analysis History – RepoSleuth{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}" class="text-secondary text-decoration-none">Dashboard</a>
+<span class="mx-2 text-muted">/</span>
+<span class="text-light fw-medium">Analysis History</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="sleuth-card mb-4 p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h5 class="fw-bold text-white mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Scanned Codebase History</h5>
+                <small class="text-muted">Repository of previously analyzed projects. View in-depth metrics or delete old records to reclaim space.</small>
+            </div>
+            <div>
+                <a href="{% url 'project_upload' %}" class="btn-sleuth-primary">
+                    <i class="bi bi-plus-lg"></i> Scan New Project
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="sleuth-card p-3 mb-4">
+        <form method="get" class="d-flex gap-2">
+            <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ query }}" class="form-control" style="background-color: #0b0f19; border-color: var(--border-color); color: #fff;" placeholder="Search projects by name...">
+            </div>
+            <button type="submit" class="btn btn-sleuth-secondary">Search</button>
+            {% if query %}
+            <a href="{% url 'history' %}" class="btn btn-outline-secondary">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Projects Table -->
+    <div class="sleuth-card p-0">
+        <div class="table-responsive">
+            <table class="sleuth-table">
+                <thead>
+                    <tr>
+                        <th>Project Name</th>
+                        <th>Scanned On</th>
+                        <th>Files & Dirs</th>
+                        <th>Lines of Code</th>
+                        <th>Health & Issues</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in projects %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'project_detail' p.id %}" class="text-decoration-none fw-semibold text-light fs-6">
+                                <i class="bi bi-folder2-open text-primary me-2"></i>{{ p.name }}
+                            </a>
+                            <div class="text-muted" style="font-size: 0.75rem;">Archive: {{ p.uploaded_zip.name }} ({{ p.formatted_size }})</div>
+                        </td>
+                        <td>
+                            <div class="text-light" style="font-size: 0.85rem;">{{ p.uploaded_at|date:"M d, Y" }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ p.uploaded_at|time:"H:i:s" }} UTC</div>
+                        </td>
+                        <td>
+                            <div class="text-light" style="font-size: 0.85rem;">{{ p.total_files }} files</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ p.total_folders }} folders</div>
+                        </td>
+                        <td>
+                            <span class="font-monospace text-light">{{ p.total_lines_of_code|default:"0" }}</span>
+                        </td>
+                        <td>
+                            {% if p.analysis %}
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge {% if p.analysis.health_score >= 80 %}bg-success{% elif p.analysis.health_score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                    {{ p.analysis.health_score }}/100
+                                </span>
+                                <span class="text-muted" style="font-size: 0.8rem;">{{ p.analysis.issue_counts.total|default:"0" }} issues</span>
+                            </div>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.status == 'completed' %}
+                                <span class="badge-confirmed"><i class="bi bi-check-circle me-1"></i> Completed</span>
+                            {% elif p.status == 'failed' %}
+                                <span class="badge-high"><i class="bi bi-x-circle me-1"></i> Failed</span>
+                            {% else %}
+                                <span class="badge-estimated">{{ p.get_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'project_detail' p.id %}" class="btn btn-outline-secondary" title="View Project Overview">
+                                    <i class="bi bi-speedometer2"></i>
+                                </a>
+                                <a href="{% url 'project_pdf' p.id %}" class="btn btn-outline-secondary" title="Download PDF Report">
+                                    <i class="bi bi-file-earmark-pdf text-danger"></i>
+                                </a>
+                                <a href="{% url 'project_delete' p.id %}" class="btn btn-outline-danger" title="Delete Project">
+                                    <i class="bi bi-trash3"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-folder-x fs-1 d-block mb-2 text-secondary"></i>
+                            {% if query %}
+                            No projects matching "<strong>{{ query }}</strong>" found.
+                            {% else %}
+                            No projects in analysis history yet.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

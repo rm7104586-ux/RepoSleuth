@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Database
+*.sqlite3
+db.sqlite3
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Static and Media
+staticfiles/
+media/uploads/*
+!media/uploads/.gitkeep
+media/extracted/*
+!media/extracted/.gitkeep
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log

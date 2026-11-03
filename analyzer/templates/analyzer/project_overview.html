@@ -1,0 +1,259 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}{{ project.name }} – RepoSleuth Project Overview{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}" class="text-secondary text-decoration-none">Dashboard</a>
+<span class="mx-2 text-muted">/</span>
+<a href="{% url 'history' %}" class="text-secondary text-decoration-none">Projects</a>
+<span class="mx-2 text-muted">/</span>
+<span class="text-light fw-medium">{{ project.name }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <!-- Project Header -->
+    <div class="sleuth-card mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h3 class="fw-bold text-white mb-0">{{ project.name }}</h3>
+                    {% if project.status == 'completed' %}
+                        <span class="badge-confirmed"><i class="bi bi-check-circle me-1"></i> Analysis Ready</span>
+                    {% elif project.status == 'failed' %}
+                        <span class="badge-high"><i class="bi bi-exclamation-triangle me-1"></i> Analysis Failed</span>
+                    {% else %}
+                        <span class="badge-estimated">{{ project.get_status_display }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-muted" style="font-size: 0.84rem;">
+                    <i class="bi bi-calendar3 me-1"></i> Uploaded on {{ project.uploaded_at|date:"F d, Y · H:i:s" }} UTC
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'project_pdf' project.id %}" class="btn-sleuth-primary">
+                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                    <span>Export PDF Report</span>
+                </a>
+                <a href="{% url 'project_delete' project.id %}" class="btn btn-outline-danger btn-sm" title="Delete Project">
+                    <i class="bi bi-trash3"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-blue">
+                    <i class="bi bi-files"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ project.total_files }}</div>
+                    <div class="stat-label">Files Cataloged</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-purple">
+                    <i class="bi bi-folder"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ project.total_folders }}</div>
+                    <div class="stat-label">Directories</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper stat-icon-emerald">
+                    <i class="bi bi-code-slash"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ project.total_lines_of_code|default:"0" }}</div>
+                    <div class="stat-label">Lines of Code</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="stat-card">
+                <div class="stat-icon-wrapper {% if analysis.health_score >= 80 %}stat-icon-emerald{% elif analysis.health_score >= 50 %}stat-icon-purple{% else %}stat-icon-rose{% endif %}">
+                    <i class="bi bi-heart-pulse-fill"></i>
+                </div>
+                <div>
+                    <div class="stat-val">{{ analysis.health_score }}/100</div>
+                    <div class="stat-label">Codebase Health</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Navigation Hub -->
+    <h5 class="fw-semibold text-white mb-3"><i class="bi bi-compass me-2 text-primary"></i>Investigation Modules</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'file_explorer' project.id %}" class="text-decoration-none">
+                <div class="sleuth-card h-100 p-3" style="transition: transform 0.15s ease;">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="stat-icon-wrapper stat-icon-blue" style="width: 44px; height: 44px; font-size: 1.25rem;">
+                            <i class="bi bi-folder-symlink"></i>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                    </div>
+                    <h6 class="text-white fw-bold mb-1">File Explorer</h6>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                        Interactive folder tree structure, file sizes, and safe code preview pane.
+                    </p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'dependency_analyzer' project.id %}" class="text-decoration-none">
+                <div class="sleuth-card h-100 p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="stat-icon-wrapper stat-icon-purple" style="width: 44px; height: 44px; font-size: 1.25rem;">
+                            <i class="bi bi-diagram-3-fill"></i>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                    </div>
+                    <h6 class="text-white fw-bold mb-1">Dependency Graph</h6>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                        AST import network showing confirmed vs estimated links and 3rd-party packages.
+                    </p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'entry_points' project.id %}" class="text-decoration-none">
+                <div class="sleuth-card h-100 p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="stat-icon-wrapper stat-icon-emerald" style="width: 44px; height: 44px; font-size: 1.25rem;">
+                            <i class="bi bi-play-circle-fill"></i>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                    </div>
+                    <h6 class="text-white fw-bold mb-1">Entry Points</h6>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                        Discovered <strong>{{ analysis.entry_points|length }}</strong> probable program execution files with rationale.
+                    </p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <a href="{% url 'code_issues' project.id %}" class="text-decoration-none">
+                <div class="sleuth-card h-100 p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="stat-icon-wrapper stat-icon-rose" style="width: 44px; height: 44px; font-size: 1.25rem;">
+                            <i class="bi bi-bug-fill"></i>
+                        </div>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                    </div>
+                    <h6 class="text-white fw-bold mb-1">Code Issues</h6>
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                        Flags syntax errors, TODO/FIXME tags, empty files, and maintainability smells.
+                    </p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Languages & Issues Breakdown Row -->
+    <div class="row g-4 mb-4">
+        <!-- Languages Table -->
+        <div class="col-lg-6">
+            <div class="sleuth-card h-100">
+                <div class="card-title-lg">
+                    <div>
+                        <i class="bi bi-filetype-py text-primary me-2"></i>
+                        <span>Languages & Extensions</span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="sleuth-table">
+                        <thead>
+                            <tr>
+                                <th>Language</th>
+                                <th>Files</th>
+                                <th>Lines</th>
+                                <th>Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lang, stats in project.languages_breakdown.items %}
+                            <tr>
+                                <td class="fw-semibold text-light">{{ lang }}</td>
+                                <td>{{ stats.files }}</td>
+                                <td>{{ stats.lines }}</td>
+                                <td>{{ stats.bytes|filesizeformat }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">No language files detected.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issues Overview Card -->
+        <div class="col-lg-6">
+            <div class="sleuth-card h-100">
+                <div class="card-title-lg">
+                    <div>
+                        <i class="bi bi-shield-exclamation text-danger me-2"></i>
+                        <span>Detected Code Smells & Issues</span>
+                    </div>
+                    <a href="{% url 'code_issues' project.id %}" class="btn-sleuth-outline py-1 px-2" style="font-size: 0.78rem;">
+                        View Details
+                    </a>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="p-3 rounded-3" style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25);">
+                            <div class="text-danger fw-bold fs-4">{{ analysis.issue_counts.syntax_errors|default:"0" }}</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">Syntax Errors</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded-3" style="background-color: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25);">
+                            <div class="text-warning fw-bold fs-4">{{ analysis.issue_counts.todos_fixmes|default:"0" }}</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">TODO / FIXME Comments</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded-3" style="background-color: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25);">
+                            <div class="text-info fw-bold fs-4">{{ analysis.issue_counts.empty_files|default:"0" }}</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">Empty Python Files</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 rounded-3" style="background-color: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25);">
+                            <div class="text-light fw-bold fs-4">{{ analysis.issue_counts.large_files|default:"0" }}</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">Oversized Files (>500 LOC)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+                    <span class="text-muted" style="font-size: 0.85rem;">Total issues found:</span>
+                    <span class="badge bg-danger fs-6">{{ analysis.issue_counts.total|default:"0" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

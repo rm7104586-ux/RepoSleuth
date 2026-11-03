@@ -1,0 +1,129 @@
+{% extends 'analyzer/base.html' %}
+{% load static %}
+
+{% block title %}Code Issues – {{ project.name }} – RepoSleuth{% endblock %}
+
+{% block breadcrumb %}
+<a href="{% url 'dashboard' %}" class="text-secondary text-decoration-none">Dashboard</a>
+<span class="mx-2 text-muted">/</span>
+<a href="{% url 'project_detail' project.id %}" class="text-secondary text-decoration-none">{{ project.name }}</a>
+<span class="mx-2 text-muted">/</span>
+<span class="text-light fw-medium">Code Issues</span>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="sleuth-card mb-4 p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h5 class="fw-bold text-white mb-0"><i class="bi bi-shield-exclamation text-danger me-2"></i>Code Issue & Smell Detector</h5>
+                <small class="text-muted">Flags AST syntax errors, inline TODOs/FIXMEs, empty modules, and maintainability concerns with exact line references.</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-secondary" style="font-size: 0.82rem;">Health Score:</span>
+                <span class="badge {% if analysis.health_score >= 80 %}bg-success{% elif analysis.health_score >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %} fs-6 px-3 py-1">
+                    {{ analysis.health_score }}/100
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Pills Row -->
+    <div class="sleuth-card p-3 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="text-muted me-2" style="font-size: 0.8rem; text-transform: uppercase;">Category:</span>
+                <a href="?category=all{% if active_severity != 'all' %}&severity={{ active_severity }}{% endif %}" class="btn btn-sm {% if active_category == 'all' %}btn-sleuth-primary{% else %}btn-sleuth-secondary{% endif %}">
+                    All ({{ counts.total|default:"0" }})
+                </a>
+                <a href="?category=syntax_error{% if active_severity != 'all' %}&severity={{ active_severity }}{% endif %}" class="btn btn-sm {% if active_category == 'syntax_error' %}btn-sleuth-primary{% else %}btn-sleuth-secondary{% endif %}">
+                    Syntax Errors ({{ counts.syntax_errors|default:"0" }})
+                </a>
+                <a href="?category=todo_fixme{% if active_severity != 'all' %}&severity={{ active_severity }}{% endif %}" class="btn btn-sm {% if active_category == 'todo_fixme' %}btn-sleuth-primary{% else %}btn-sleuth-secondary{% endif %}">
+                    TODO / FIXME ({{ counts.todos_fixmes|default:"0" }})
+                </a>
+                <a href="?category=empty_file{% if active_severity != 'all' %}&severity={{ active_severity }}{% endif %}" class="btn btn-sm {% if active_category == 'empty_file' %}btn-sleuth-primary{% else %}btn-sleuth-secondary{% endif %}">
+                    Empty Files ({{ counts.empty_files|default:"0" }})
+                </a>
+                <a href="?category=large_file{% if active_severity != 'all' %}&severity={{ active_severity }}{% endif %}" class="btn btn-sm {% if active_category == 'large_file' %}btn-sleuth-primary{% else %}btn-sleuth-secondary{% endif %}">
+                    Large Files ({{ counts.large_files|default:"0" }})
+                </a>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted" style="font-size: 0.8rem; text-transform: uppercase;">Severity:</span>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-sleuth-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        {% if active_severity == 'all' %}All Severities{% else %}{{ active_severity }}{% endif %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="?category={{ active_category }}&severity=all">All</a></li>
+                        <li><a class="dropdown-item text-danger" href="?category={{ active_category }}&severity=High">High</a></li>
+                        <li><a class="dropdown-item text-warning" href="?category={{ active_category }}&severity=Medium">Medium</a></li>
+                        <li><a class="dropdown-item text-info" href="?category={{ active_category }}&severity=Low">Low</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issues Table -->
+    <div class="sleuth-card p-0">
+        <div class="table-responsive">
+            <table class="sleuth-table">
+                <thead>
+                    <tr>
+                        <th style="width: 110px;">Severity</th>
+                        <th style="width: 140px;">Category</th>
+                        <th style="width: 250px;">File & Line</th>
+                        <th>Issue Details & Code Excerpt</th>
+                        <th class="text-end" style="width: 120px;">Explorer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for issue in issues %}
+                    <tr>
+                        <td>
+                            {% if issue.severity == 'High' %}
+                                <span class="badge-high"><i class="bi bi-x-circle me-1"></i> High</span>
+                            {% elif issue.severity == 'Medium' %}
+                                <span class="badge-medium"><i class="bi bi-exclamation-triangle me-1"></i> Medium</span>
+                            {% elif issue.severity == 'Low' %}
+                                <span class="badge-low"><i class="bi bi-info-circle me-1"></i> Low</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Info</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="text-light fw-medium">{{ issue.title }}</span>
+                        </td>
+                        <td>
+                            <div class="font-monospace text-light" style="font-size: 0.85rem;">{{ issue.file }}</div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Line: <strong>{{ issue.line }}</strong>{% if issue.column %} · Col: {{ issue.column }}{% endif %}</div>
+                        </td>
+                        <td>
+                            <div class="text-light mb-1">{{ issue.description }}</div>
+                            {% if issue.snippet %}
+                            <pre class="code-block mb-0 py-1 px-2" style="font-size: 0.78rem;"><code>{{ issue.snippet }}</code></pre>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'file_explorer' project.id %}" class="btn btn-sm btn-outline-secondary" title="Inspect in File Explorer">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                            No issues matching this filter found. Codebase clean!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
